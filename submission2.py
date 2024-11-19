@@ -5,6 +5,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import mean_squared_error
+from tensorflow.python.keras.models import Sequential
+# from tensorflow.python.keras.layers import Dense, Dropout, LSTM, 
+from tensorflow.python.keras.layers import Dense, Dropout, LSTM
+from tensorflow.python.keras.callbacks import TensorBoard, ModelCheckpoint
+
+
 
 
 df = pd.read_csv('df.csv')
@@ -47,15 +53,44 @@ scaler = StandardScaler()
 X_train = scaler.fit_transform(X_train)
 X_val = scaler.transform(X_val)
 
-model = tf.keras.Sequential([
-    tf.keras.layers.Dense(64, activation='relu', input_shape=(X_train.shape[1],)),
-    tf.keras.layers.Dense(32, activation='relu'),
-    tf.keras.layers.Dense(1) 
-])
+# model = tf.keras.Sequential([
+#     tf.keras.layers.Dense(64, activation='relu', input_shape=(X_train.shape[1],)),
+#     # tf.keras.layers.Dropout(0.3),
+#     tf.keras.layers.Dense(32, activation='relu'),
+#     # tf.keras.layers.Dropout(0.3),
+#     tf.keras.layers.Dense(1) 
+# ])
 
-model.compile(optimizer='adam', loss='mse', metrics=['mae'])
+model = Sequential()
+model.add(LSTM(128, input_shape = (X_train.shape[1:]), return_sequences=True))
+model.add(Dropout(0.2))
+model.add(tf.keras.layers.BatchNormalization())
 
-history = model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=50, batch_size=32, verbose=1)
+model.add(LSTM(128, input_shape = (X_train.shape[1:]), return_sequences=True))
+model.add(Dropout(0.1))
+model.add(tf.keras.layers.BatchNormalization())
+
+model.add(LSTM(128, input_shape = (X_train.shape[1:]), return_sequences=True))
+model.add(Dropout(0.2))
+model.add(tf.keras.layers.BatchNormalization())
+
+model.add(Dense(2, activation="relu"))
+model.add(Dropout(0.2))
+
+model.add(Dense(1))
+
+opt = tf.keras.optimizers.Adam(lr = 0.001, decay = 1e-6)
+
+
+# model.compile(optimizer='adam', loss='mse', metrics=['mae'])
+
+model.compile(optimizer=opt, loss='mse', metrics=['mae'])
+
+
+early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+
+history = model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=3, batch_size=32, verbose=1, callbacks=[early_stopping])
+
 
 y_pred = model.predict(X_val)
 mse = mean_squared_error(y_val, y_pred)
