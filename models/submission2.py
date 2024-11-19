@@ -5,10 +5,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import mean_squared_error
-from tensorflow.python.keras.models import Sequential
-# from tensorflow.python.keras.layers import Dense, Dropout, LSTM, 
-from tensorflow.python.keras.layers import Dense, Dropout, LSTM
-from tensorflow.python.keras.callbacks import TensorBoard, ModelCheckpoint
+# from tensorflow.python.keras.models import Sequential
+# from tensorflow.python.keras.layers import Dense, Dropout, InputLayer
+# from tensorflow.python.keras.callbacks import TensorBoard, ModelCheckpoint
 
 
 
@@ -61,26 +60,24 @@ X_val = scaler.transform(X_val)
 #     tf.keras.layers.Dense(1) 
 # ])
 
-model = Sequential()
-model.add(LSTM(128, input_shape = (X_train.shape[1:]), return_sequences=True))
-model.add(Dropout(0.2))
+# Reshape data to 3D for LSTM
+X_train = X_train.reshape((X_train.shape[0], 1, X_train.shape[1]))
+X_val = X_val.reshape((X_val.shape[0], 1, X_val.shape[1]))
+
+# Define the model
+model = tf.keras.models.Sequential()
+model.add(tf.keras.layers.InputLayer(shape=(1, X_train.shape[2])))  # Define input shape explicitly
+model.add(tf.keras.layers.LSTM(128, return_sequences=True))
+model.add(tf.keras.layers.Dropout(0.2))
 model.add(tf.keras.layers.BatchNormalization())
 
-model.add(LSTM(128, input_shape = (X_train.shape[1:]), return_sequences=True))
-model.add(Dropout(0.1))
-model.add(tf.keras.layers.BatchNormalization())
+model.add(tf.keras.layers.LSTM(128, return_sequences=False))
+model.add(tf.keras.layers.Dropout(0.2))
+model.add(tf.keras.layers.Dense(64, activation='relu'))
+model.add(tf.keras.layers.Dropout(0.2))
+model.add(tf.keras.layers.Dense(1))  # Regression output
 
-model.add(LSTM(128, input_shape = (X_train.shape[1:]), return_sequences=True))
-model.add(Dropout(0.2))
-model.add(tf.keras.layers.BatchNormalization())
-
-model.add(Dense(2, activation="relu"))
-model.add(Dropout(0.2))
-
-model.add(Dense(1))
-
-opt = tf.keras.optimizers.Adam(lr = 0.001, decay = 1e-6)
-
+opt = tf.keras.optimizers.Adam(learning_rate = 0.001, decay = 1e-6)
 
 # model.compile(optimizer='adam', loss='mse', metrics=['mae'])
 
