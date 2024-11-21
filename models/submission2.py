@@ -8,8 +8,10 @@ from sklearn.metrics import mean_squared_error
 import keras_tuner
 from keras_tuner import HyperParameters
 
+#Load data
 df = pd.read_csv('df.csv')
 
+#Manipulate data
 def preprocess_data(data, is_training=True, training_columns=None):
     data = data.copy()
     
@@ -37,15 +39,20 @@ def preprocess_data(data, is_training=True, training_columns=None):
     
     return data
 
+
 def build_model(hp):
     model = tf.keras.Sequential()
+    #Input layer
     model.add(tf.keras.layers.Dense(hp.Int("input_units", 32, 256, 32), activation='relu', input_shape=(X_train.shape[1],)))
 
+    #Variable number of hidden layers (using hyperparameter tuning)
     for i in range(hp.Int("num_layers", 1, 4, 1)):
         tf.keras.layers.Dense(hp.Int(f"layer_{i}_units", 32, 256, 32), activation='relu')
     
+    #Output layer
     model.add(tf.keras.layers.Dense(1))
 
+    #Optimizer
     opt = tf.keras.optimizers.Adam()
 
     model.compile(optimizer=opt, loss='mse', metrics=['mae'])
@@ -56,29 +63,35 @@ y = df['time2']
 
 training_columns = X.columns
 
+#Split data
 X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
 
 scaler = StandardScaler()
 X_train = scaler.fit_transform(X_train)
 X_val = scaler.transform(X_val)
 
+#Initiate Hyperparameter Tuning
 tuner = keras_tuner.RandomSearch(
     build_model,
     objective='val_loss',
     max_trials=10)
 
 tuner.search(X_train, y_train, epochs=3, validation_data=(X_val, y_val))
+
+#Find best model
 best_model = tuner.get_best_models()[0]
 
+#Reduce overfitting with early stopping
 early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
 
 history = best_model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=30, batch_size=32, verbose=1, callbacks=[early_stopping])
 
-
+#Check mean squared error on training dataset
 y_pred = best_model.predict(X_val)
 mse = mean_squared_error(y_val, y_pred)
 print(f"Validation Mean Squared Error: {mse:.4f}")
 
+#Run model on testing dataset
 unseen_df = pd.read_csv('unseendf_example.csv')
 
 X_unseen = preprocess_data(unseen_df, is_training=False, training_columns=training_columns)
