@@ -38,19 +38,15 @@ def preprocess_data(data, is_training=True, training_columns=None):
     return data
 
 def build_model(hp):
-    #mess around with dropout and batch normalization
     model = tf.keras.Sequential()
     model.add(tf.keras.layers.Dense(hp.Int("input_units", 32, 256, 32), activation='relu', input_shape=(X_train.shape[1],)))
 
     for i in range(hp.Int("num_layers", 1, 4, 1)):
         tf.keras.layers.Dense(hp.Int(f"layer_{i}_units", 32, 256, 32), activation='relu')
-        if(hp.Boolean(f"layer_{i}_drop")):
-            model.add(tf.keras.layers.Dropout(0.3))
     
     model.add(tf.keras.layers.Dense(1))
 
-    #mess with learning rate
-    opt = tf.keras.optimizers.Adam(learning_rate = 0.001)
+    opt = tf.keras.optimizers.Adam()
 
     model.compile(optimizer=opt, loss='mse', metrics=['mae'])
     return model
@@ -69,14 +65,14 @@ X_val = scaler.transform(X_val)
 tuner = keras_tuner.RandomSearch(
     build_model,
     objective='val_loss',
-    max_trials=5)
+    max_trials=10)
 
-tuner.search(X_train, y_train, epochs=5, validation_data=(X_val, y_val))
+tuner.search(X_train, y_train, epochs=3, validation_data=(X_val, y_val))
 best_model = tuner.get_best_models()[0]
 
 early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
 
-history = best_model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=5, batch_size=32, verbose=1, callbacks=[early_stopping])
+history = best_model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=30, batch_size=32, verbose=1, callbacks=[early_stopping])
 
 
 y_pred = best_model.predict(X_val)
@@ -92,5 +88,3 @@ unseen_df['predtime'] = best_model.predict(X_unseen).flatten()
 
 unseen_df.to_csv('./predictions/mypred2.csv', index=False)
 print("Predictions saved to mypred2.csv")
-
-#0.1533
