@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from xgboost import XGBRegressor
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, RandomizedSearchCV
 from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import StandardScaler
 from sklearn.impute import SimpleImputer
@@ -61,11 +61,37 @@ model = Pipeline([
     ))
 ])
 
-#Fit the model on training data
-model.fit(X_train, y_train)
 
-#Check mean squared error on training dataset
-y_pred = model.predict(X_val)
+#Define parameters for tuning
+params = {
+    'regressor__n_estimators': [100, 500, 1000],
+    'regressor__learning_rate': [0.01, 0.05, 0.1],
+    'regressor__max_depth': [4, 6, 8],
+    'regressor__subsample': [0.7, 0.8, 0.9],
+    'regressor__colsample_bytree': [0.7, 0.8, 0.9]
+}
+
+#Tune hyperparameters
+random_search = RandomizedSearchCV(
+    model,
+    params,
+    n_iter=10,
+    scoring='neg_mean_squared_error',
+    cv=3,
+    verbose=2,
+    random_state=42,
+    n_jobs=-1
+)
+
+#Run the grid search
+random_search.fit(X_train, y_train)
+
+#Get the best parameters
+best_params = random_search.best_params_
+
+#Evaluate the best model on validation data
+best_model = random_search.best_estimator_
+y_pred = best_model.predict(X_val)
 mse = mean_squared_error(y_val, y_pred)
 print(f"Validation Mean Squared Error: {mse:.4f}")
 
@@ -73,8 +99,7 @@ print(f"Validation Mean Squared Error: {mse:.4f}")
 unseen_df = pd.read_csv('unseendf_example.csv')
 X_unseen = preprocess_data(unseen_df, is_training=False, training_columns=training_columns)
 
-unseen_df['predtime'] = model.predict(X_unseen)
+unseen_df['time2'] = best_model.predict(X_unseen)
 
-# Save predictions
 unseen_df.to_csv('./predictions/mypred.csv', index=False)
 print("Predictions saved to mypred.csv")
