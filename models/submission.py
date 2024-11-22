@@ -1,14 +1,16 @@
 import pandas as pd
 import numpy as np
-from sklearn.ensemble import GradientBoostingRegressor
+from xgboost import XGBRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
-from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.impute import SimpleImputer
+from sklearn.pipeline import Pipeline
 
+#Load data
 df = pd.read_csv('df.csv')
 
+#Manipulate data
 def preprocess_data(data, is_training=True, training_columns=None):
     data = data.copy()
     
@@ -27,7 +29,7 @@ def preprocess_data(data, is_training=True, training_columns=None):
         for col in training_columns:
             if col not in data.columns:
                 data[col] = 0
-        data = data[training_columns] 
+        data = data[training_columns]
     
     drop_cols = ['birthdate', 'date1', 'date2', 'comment1']
     if is_training:
@@ -41,27 +43,38 @@ y = df['time2']
 
 training_columns = X.columns
 
+#Split data
 X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
 
+#Define model (using Extreme Gradient Boosting)
 model = Pipeline([
     ('imputer', SimpleImputer(strategy='median')),
     ('scaler', StandardScaler()),
-    ('regressor', GradientBoostingRegressor(random_state=42))
+    ('regressor', XGBRegressor(
+        n_estimators=1000,
+        learning_rate=0.05,
+        max_depth=6,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        random_state=42,
+        objective='reg:squarederror'
+    ))
 ])
 
+#Fit the model on training data
 model.fit(X_train, y_train)
 
+#Check mean squared error on training dataset
 y_pred = model.predict(X_val)
 mse = mean_squared_error(y_val, y_pred)
 print(f"Validation Mean Squared Error: {mse:.4f}")
 
+#Run model on testing dataset
 unseen_df = pd.read_csv('unseendf_example.csv')
-
 X_unseen = preprocess_data(unseen_df, is_training=False, training_columns=training_columns)
 
 unseen_df['predtime'] = model.predict(X_unseen)
 
+# Save predictions
 unseen_df.to_csv('./predictions/mypred.csv', index=False)
 print("Predictions saved to mypred.csv")
-
-#0.1678
